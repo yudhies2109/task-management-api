@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Middleware\EnsureTrustedOrigin;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\V1\TaskController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/health', function () {
@@ -40,4 +41,8 @@ Route::prefix('v1')->group(function () {
             'message' => 'Akses admin berhasil.',
         ]);
     })->middleware(['auth:api', 'admin']);
+
+    Route::middleware('auth:api')->group(function () {
+        Route::apiResource('tasks', TaskController::class);
+    });
 });

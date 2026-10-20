@@ -60,4 +60,12 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->role === 'admin';
     }
+
+    /**
+     * Semua task yang dimiliki pengguna.
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
 }
