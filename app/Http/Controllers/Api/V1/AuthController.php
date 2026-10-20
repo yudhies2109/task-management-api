@@ -9,6 +9,7 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use PHPOpenSourceSaver\JWTAuth\JWTGuard;
+use App\Services\Auth\RefreshTokenService;
 
 class AuthController extends Controller
 {
@@ -36,10 +37,12 @@ class AuthController extends Controller
     }
 
     /**
-     * Memeriksa kredensial dan menerbitkan JWT access token.
+     * Menerbitkan JWT access token dan cookie refresh token.
      */
-    public function login(LoginRequest $request): JsonResponse
-    {
+    public function login(
+        LoginRequest $request,
+        RefreshTokenService $refreshTokenService
+    ): JsonResponse {
         $credentials = $request->validated();
 
         /** @var JWTGuard $guard */
@@ -55,6 +58,22 @@ class AuthController extends Controller
 
         $user = $guard->user();
 
+        // Membuat refresh token dan menyimpan hash-nya di database.
+        $refreshToken = $refreshTokenService->issue($user);
+
+        // Cookie dikirim ke semua endpoint dengan path /api/v1.
+        $cookie = cookie(
+            'refresh_token',
+            $refreshToken['token'],
+            config('tokens.refresh_ttl_days') * 24 * 60,
+            '/api/v1',
+            null,
+            $request->isSecure(),
+            true,
+            false,
+            'lax'
+        );
+
         return response()->json([
             'message' => 'Login berhasil.',
             'data' => [
@@ -67,7 +86,9 @@ class AuthController extends Controller
                     'email' => $user->email,
                 ],
             ],
-        ])->header('Cache-Control', 'no-store');
+        ])
+            ->header('Cache-Control', 'no-store')
+            ->withCookie($cookie);
     }
 
     public function me(): JsonResponse
