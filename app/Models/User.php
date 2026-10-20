@@ -52,4 +52,12 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasMany(RefreshToken::class);
     }
+
+    /**
+     * Memeriksa apakah pengguna memiliki role admin.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
 }

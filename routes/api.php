@@ -34,4 +34,10 @@ Route::prefix('v1')->group(function () {
             EnsureTrustedOrigin::class,
             'throttle:10,1',
         ]);
+
+    Route::get('/admin/check', function () {
+        return response()->json([
+            'message' => 'Akses admin berhasil.',
+        ]);
+    })->middleware(['auth:api', 'admin']);
 });
