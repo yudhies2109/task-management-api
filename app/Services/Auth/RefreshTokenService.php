@@ -117,4 +117,34 @@ class RefreshTokenService
             ];
         });
     }
+
+    /**
+     * Mencabut keluarga refresh token untuk satu sesi login.
+     */
+    public function revoke(string $plainToken): void
+    {
+        $existing = RefreshToken::where(
+            'token_hash',
+            hash('sha256', $plainToken)
+        )->first();
+
+        if (! $existing) {
+            return;
+        }
+
+        DB::transaction(function () use ($existing) {
+            // Mencegah refresh dan logout saling mendahului.
+            $user = User::whereKey($existing->user_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $user) {
+                return;
+            }
+
+            RefreshToken::where('family_id', $existing->family_id)
+                ->whereNull('revoked_at')
+                ->update(['revoked_at' => now()]);
+        });
+    }
 }

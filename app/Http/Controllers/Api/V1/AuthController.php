@@ -175,4 +175,29 @@ class AuthController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Mencabut refresh token dan menghapus cookie.
+     */
+    public function logout(
+        Request $request,
+        RefreshTokenService $refreshTokenService
+    ): JsonResponse {
+        $plainToken = $request->cookie('refresh_token');
+
+        if (
+            is_string($plainToken) &&
+            preg_match('/\A[a-f0-9]{64}\z/', $plainToken)
+        ) {
+            $refreshTokenService->revoke($plainToken);
+        }
+
+        return response()->json([
+            'message' => 'Logout berhasil.',
+        ])
+            ->header('Cache-Control', 'no-store')
+            ->withCookie(
+                cookie()->forget('refresh_token', '/api/v1')
+            );
+    }
 }

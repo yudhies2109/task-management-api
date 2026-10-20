@@ -28,4 +28,10 @@ Route::prefix('v1')->group(function () {
             EnsureTrustedOrigin::class,
             'throttle:10,1',
         ]);
+
+    Route::post('/logout', [AuthController::class, 'logout'])
+        ->middleware([
+            EnsureTrustedOrigin::class,
+            'throttle:10,1',
+        ]);
 });
