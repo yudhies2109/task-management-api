@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Middleware\EnsureTrustedOrigin;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -14,8 +15,17 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:5,1');
 
     Route::post('/login', [AuthController::class, 'login'])
-        ->middleware('throttle:5,1');
+        ->middleware([
+            EnsureTrustedOrigin::class,
+            'throttle:5,1',
+        ]);
 
     Route::get('/me', [AuthController::class, 'me'])
         ->middleware('auth:api');
+
+    Route::post('/refresh-token', [AuthController::class, 'refresh'])
+        ->middleware([
+            EnsureTrustedOrigin::class,
+            'throttle:10,1',
+        ]);
 });
