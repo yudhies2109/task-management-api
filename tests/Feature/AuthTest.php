@@ -9,6 +9,8 @@ use RuntimeException;
 use Tests\TestCase;
 use App\Models\RefreshToken;
 use App\Services\Auth\RefreshTokenService;
+use Illuminate\Support\Facades\Auth;
+use PHPOpenSourceSaver\JWTAuth\JWTGuard;
 
 class AuthTest extends TestCase
 {
@@ -348,5 +350,94 @@ class AuthTest extends TestCase
         $this->assertNull(
             $service->rotate($issued['token'])
         );
+    }
+
+    /**
+     * JWT valid dapat digunakan untuk mengakses profil.
+     */
+    public function test_me_accepts_valid_token(): void
+    {
+        $user = User::factory()->create();
+
+        /** @var JWTGuard $guard */
+        $guard = Auth::guard('api');
+
+        $token = $guard->login($user);
+
+        // Bersihkan guard agar request harus membaca token dari header.
+        Auth::forgetGuards();
+
+        $this->withToken($token)
+            ->getJson('/api/v1/me')
+            ->assertOk()
+            ->assertJsonPath('data.id', $user->id)
+            ->assertJsonPath('data.email', $user->email)
+            ->assertJsonMissingPath('data.password');
+    }
+
+    /**
+     * Token palsu harus ditolak.
+     */
+    public function test_me_rejects_invalid_token(): void
+    {
+        $this->withToken('token-tidak-valid')
+            ->getJson('/api/v1/me')
+            ->assertUnauthorized();
+    }
+
+    /**
+     * JWT yang kedaluwarsa harus ditolak.
+     */
+    public function test_me_rejects_expired_token(): void
+    {
+        $user = User::factory()->create();
+
+        /** @var JWTGuard $guard */
+        $guard = Auth::guard('api');
+
+        // Buat JWT dengan masa berlaku satu menit.
+        $token = $guard->setTTL(1)->login($user);
+
+        Auth::forgetGuards();
+
+        // Simulasikan dua menit berlalu tanpa menunggu sungguhan.
+        $this->travel(2)->minutes();
+
+        try {
+            $this->withToken($token)
+                ->getJson('/api/v1/me')
+                ->assertUnauthorized();
+        } finally {
+            $this->travelBack();
+        }
+    }
+
+    /**
+     * Origin tidak tepercaya tidak boleh merotasi atau mencabut token.
+     */
+    public function test_refresh_and_logout_reject_untrusted_origin(): void
+    {
+        $user = User::factory()->create();
+
+        $issued = app(RefreshTokenService::class)->issue($user);
+
+        $this
+            ->withCredentials()
+            ->withUnencryptedCookie('refresh_token', $issued['token'])
+            ->withHeaders([
+                'Origin' => 'https://untrusted.example',
+            ]);
+
+        $this->postJson('/api/v1/refresh-token')
+            ->assertForbidden();
+
+        $this->postJson('/api/v1/logout')
+            ->assertForbidden();
+
+        // Penolakan origin tidak boleh mengubah token.
+        $record = RefreshToken::sole();
+
+        $this->assertNull($record->used_at);
+        $this->assertNull($record->revoked_at);
     }
 }
